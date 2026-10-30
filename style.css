@@ -30,3 +30,12 @@
 .nutrient-field input{min-height:44px;font-size:16px}
 @media(max-width:650px){.nutrient-inputs{grid-template-columns:minmax(0,1fr);gap:20px}.portion-choices{gap:7px}.portion-choices button{min-height:48px}}
 @media(max-width:360px){dialog{padding-left:12px;padding-right:12px}.portion-choices{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}}
+#entry-form .form-grid{grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}
+#entry-form .form-grid>label{min-width:0;max-width:100%}
+#entry-form input[type=date],#entry-form select{display:block;width:100%;min-width:0;max-width:100%;min-inline-size:0;max-inline-size:100%;min-height:48px}
+@media(max-width:650px){
+  #entry-form .form-grid{column-gap:14px}
+  #entry-form input[type=date],#entry-form select{font-size:16px}
+  #entry-form input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
+}
+@media(max-width:360px){#entry-form .form-grid>label:has(>input[type=date]),#entry-form .form-grid>label:has(>select[name=meal]){grid-column:1/-1}}
