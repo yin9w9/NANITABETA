@@ -24,17 +24,18 @@ $('#go-today').onclick=()=>{$('#day').value=dateKey();render();};
 function chips(e){const s=servings(e);return keys.filter(k=>s[k]>0).map(k=>`${labels[k]} ${fmt(s[k])}${unit(k)}`).join(' · ')||'尚未填寫營養素';}
 function entryHTML(e,withDate=false){return `<article class="entry"><div class="food-icon">${e.meal==='飲水'?'💧':({'早餐':'🍞','午餐':'🍱','晚餐':'🍲','點心':'🍡'}[e.meal]||'🍽️')}</div><div class="entry-body">${withDate?`<div class="entry-date">${esc(e.date)} · ${esc(e.meal)}</div>`:''}<strong>${esc(e.name)}</strong><p>${chips(e)}</p>${e.note?`<p>${esc(e.note)}</p>`:''}${e.mode==='grams'?`<p>原始克數：蛋白質 ${fmt(e.protein)}g／碳水 ${fmt(e.carbs)}g／油脂 ${fmt(e.fat)}g · 基數 ${e.factor}</p>`:''}</div><div class="entry-actions"><button class="icon-button" data-edit="${esc(e.id)}" aria-label="編輯 ${esc(e.name)}">✎ 編輯</button><button class="icon-button" data-delete="${esc(e.id)}" aria-label="刪除 ${esc(e.name)}">×</button></div></article>`;}
 function bindEntries(){ $$('[data-edit]').forEach(b=>b.onclick=()=>openEntry(entries.find(e=>e.id===b.dataset.edit)));$$('[data-delete]').forEach(b=>b.onclick=async()=>{if(!await ask('刪除這筆飲食紀錄？'))return;b.disabled=true;try{await removeEntry(b.dataset.delete);notify('已刪除紀錄');}catch(e){notify('刪除失敗：'+e.message);b.disabled=false;}}); }
+function isWaterRecord(e){return e.meal==='飲水'||(Number(e.water)>0&&['protein','carbs','fat','veg'].every(k=>Number(e[k]||0)===0));}
 function render(){
- const day=$('#day').value||dateKey(),selected=entries.filter(e=>e.date===day),total=totals(selected);
+ const day=$('#day').value||dateKey(),selected=entries.filter(e=>e.date===day),total=totals(selected),food=selected.filter(e=>!isWaterRecord(e));
  $('#weekday').textContent=new Date(day+'T12:00:00').toLocaleDateString('zh-TW',{weekday:'long'});
  $('#rings').innerHTML=keys.map(k=>{const pct=total[k]/goals[k]*100;return `<div class="ring-card" style="--color:${colors[k][0]};--tint:${colors[k][1]};--percent:${Math.min(100,pct)}%"><div class="ring-title">${icons[k]} ${labels[k]}</div><div class="ring" role="img" aria-label="${labels[k]} ${fmt(total[k])}，目標 ${goals[k]}${unit(k)}"><div class="ring-value">${fmt(total[k])}<small>/ ${goals[k]} ${unit(k)}</small></div></div><div class="ring-meta">${pct>=100?'目標達成 ✓':`還差 ${fmt(Math.max(0,goals[k]-total[k]))} ${unit(k)}`}</div></div>`;}).join('');
- $('#entry-count').textContent=`${selected.length} 筆紀錄`;
- $('#meals').innerHTML=selected.length?['早餐','午餐','晚餐','點心','飲水'].map(m=>{const list=selected.filter(e=>e.meal===m);return list.length?`<div class="meal-group"><h3>${m}</h3>${list.map(e=>entryHTML(e)).join('')}</div>`:'';}).join(''):'<div class="empty"><span class="empty-icon">🍽️</span>此日期尚無飲食紀錄。<br><button class="secondary add-entry">＋ 新增飲食紀錄</button></div>';
- const r=range($('#history-day').value||dateKey(),$('#period').value),history=entries.filter(e=>e.date>=r.from&&e.date<=r.to).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)),sum=totals(history);
+ $('#entry-count').textContent=`${food.length} 筆紀錄`;
+ $('#meals').innerHTML=food.length?['早餐','午餐','晚餐','點心'].map(m=>{const list=food.filter(e=>e.meal===m);return list.length?`<div class="meal-group"><h3>${m}</h3>${list.map(e=>entryHTML(e)).join('')}</div>`:'';}).join(''):'<div class="empty"><span class="empty-icon">🍽️</span>此日期尚無飲食紀錄。<br><button class="secondary add-entry">＋ 新增飲食紀錄</button></div>';
+ const r=range($('#history-day').value||dateKey(),$('#period').value),history=entries.filter(e=>e.date>=r.from&&e.date<=r.to).sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id)),sum=totals(history),historyFood=history.filter(e=>!isWaterRecord(e));
  $('#range-label').textContent=`${r.from} — ${r.to} · 共 ${r.days} 天（包含無紀錄日；當期計算至今天）`;
  $('#averages').innerHTML=keys.map(k=>`<div class="average" style="--tint:${colors[k][1]}"><span>${icons[k]} ${labels[k]}</span><strong>${fmt(sum[k]/r.days)} <small>${unit(k)}／天</small></strong><small>期間合計 ${fmt(sum[k])} ${unit(k)}</small></div>`).join('');
- $('#history-count').textContent=`${history.length} 筆`;
- $('#history-list').innerHTML=history.length?history.map(e=>entryHTML(e,true)).join(''):'<div class="empty">此期間無飲食紀錄</div>';
+ $('#history-count').textContent=`${historyFood.length} 筆`;
+ $('#history-list').innerHTML=historyFood.length?historyFood.map(e=>entryHTML(e,true)).join(''):'<div class="empty">此期間無飲食紀錄</div>';
  $$('.add-entry').forEach(b=>b.onclick=()=>openEntry());bindEntries();
 }
 function renderGoals(){$('#goals-form').innerHTML=keys.map(k=>`<label>${icons[k]} ${labels[k]}（${unit(k)}）<input name="${k}" type="number" min="0.01" max="100000" step="any" value="${goals[k]}" required></label>`).join('')+'<button class="primary full">儲存每日目標</button>';}
