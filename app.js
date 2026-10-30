@@ -45,8 +45,9 @@ function renderInputs(e){
  const gram=form.elements.mode.value==='grams';$('#factor-label').hidden=!gram;
  $('#nutrient-inputs').innerHTML=['protein','carbs','fat','veg','water'].map(k=>{
   const value=e?.[k]??0,u=k==='water'?'ml':k==='veg'?'份':gram?'g':'份',id='nutrient-'+k;
-  const quick=!gram&&k!=='water',manual=quick&&value!==0&&![1,2,3,4].includes(Number(value));
-  return `<div class="nutrient-field" ${quick?`data-portion="${k}" data-manual="${manual}"`:''}><label for="${id}">${icons[k]} ${labels[k]}（${u}）</label>${quick?`<div class="portion-choices" role="group" aria-label="${labels[k]}份數">${[1,2,3,4].map(n=>`<button type="button" data-value="${n}" aria-label="${labels[k]} ${n}份" aria-pressed="false">${n}</button>`).join('')}<button type="button" data-manual-input aria-label="自行輸入${labels[k]}份數" aria-pressed="false">輸入</button></div><span class="portion-value" aria-live="polite"></span>`:''}<input id="${id}" name="${k}" aria-label="${labels[k]}（${u}）" type="number" inputmode="decimal" min="0" max="100000" step="any" value="${value}" ${quick&&!manual?'hidden':''} required></div>`;
+  const quick=!gram||k==='water',choices=k==='water'?[250,500,750,1000]:[1,2,3,4],quantity=k==='water'?'量':'份數';
+  const manual=quick&&Number(value)!==0&&!choices.includes(Number(value));
+  return `<div class="nutrient-field" ${quick?`data-portion="${k}" data-unit="${u}" data-manual="${manual}"`:''}><label for="${id}">${icons[k]} ${labels[k]}（${u}）</label>${quick?`<div class="portion-choices" role="group" aria-label="${labels[k]}${quantity}">${choices.map(n=>`<button type="button" data-value="${n}" aria-label="${labels[k]} ${n}${u}" aria-pressed="false">${n}</button>`).join('')}<button type="button" data-manual-input aria-label="自行輸入${labels[k]}${quantity}" aria-pressed="false">輸入</button></div><span class="portion-value" aria-live="polite"></span>`:''}<input id="${id}" name="${k}" aria-label="${labels[k]}（${u}）" type="number" inputmode="decimal" min="0" max="100000" step="any" value="${value}" ${quick&&!manual?'hidden':''} required></div>`;
  }).join('');
  $$('[data-portion]').forEach(field=>{
   const input=field.querySelector('input');
@@ -61,7 +62,7 @@ function renderInputs(e){
 function syncPortionControls(){
  $$('[data-portion]').forEach(field=>{
   const input=field.querySelector('input'),manual=field.dataset.manual==='true',value=Number(input.value)||0;
-  field.querySelector('.portion-value').textContent=value===0?'0 份 · 不計入':`${fmt(value)} 份`;
+  field.querySelector('.portion-value').textContent=value===0?`0 ${field.dataset.unit} · 不計入`:`${fmt(value)} ${field.dataset.unit}`;
   field.querySelectorAll('[data-value]').forEach(button=>button.setAttribute('aria-pressed',String(!manual&&value===Number(button.dataset.value))));
   field.querySelector('[data-manual-input]').setAttribute('aria-pressed',String(manual));
  });
