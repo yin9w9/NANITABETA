@@ -1,5 +1,9 @@
 # 何食べた · 飲食手帳
 
+正式網站：[https://yin9w9.github.io/NANITABETA/](https://yin9w9.github.io/NANITABETA/)
+
+已建立獨立 Firebase 專案 `nanitabeta-8d597`（Spark），Firestore 位於台灣 asia-east1，已啟用 Google 登入、正式網域授權及本人存取規則，公開 Web config 已隨網站部署。
+
 日系低飽和配色的響應式飲食紀錄網頁，純 HTML / CSS / JavaScript，支援 GitHub Pages 專案路徑。
 
 ## 使用
@@ -30,6 +34,6 @@
 
 ## 驗證
 
-`node --test nutrition.test.mjs`：營養換算、負值、基數、跨年週、閏月、季度、含空白日平均。瀏覽器驗證新增克數餐點、重新載入保留、歷史清單與平均。Firebase 實際同步須完成專案設定後驗收。
+`node --test nutrition.test.mjs`：8項測試通過，涵蓋營養換算、負值、基數、跨年週、閏月、季度、含空白日平均。瀏覽器驗證新增克數餐點、編輯基數、重新載入保留、歷史清單與平均，以及390px內嵌手機版。正式站已驗證 Google 登入及 Firestore 連線和目標寫入。實體手機與電腦的跨裝置驗收仍待使用者完成。
 
 官方文件：[Firebase Google 登入](https://firebase.google.com/docs/auth/web/google-signin)、[Firestore 即時監聽](https://firebase.google.com/docs/firestore/query-data/listen)、[GitHub Pages 設定](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site)。
