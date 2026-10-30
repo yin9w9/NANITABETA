@@ -39,3 +39,14 @@
   #entry-form input[type=date]::-webkit-date-and-time-value{min-width:0;text-align:left}
 }
 @media(max-width:360px){#entry-form .form-grid>label:has(>input[type=date]),#entry-form .form-grid>label:has(>select[name=meal]){grid-column:1/-1}}
+/* Native iOS date controls must not determine their parent's intrinsic width. */
+.date-input-box{display:block;position:relative;width:100%;min-width:0;max-width:100%;height:52px;overflow:hidden;border:1px solid #dddfd3;background:#fffefa;border-radius:9px;isolation:isolate}
+.date-input-box:focus-within{outline:2px solid #b4c2a4;outline-offset:1px}
+#entry-form .date-input-box input[type=date],.filters .date-input-box input[type=date]{position:absolute;inset:0;display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-inline-size:0;height:100%;margin:0;border:0;border-radius:0;-webkit-appearance:none;appearance:none;font-size:16px;overflow:hidden}
+.date-input-box input[type=date]::-webkit-date-and-time-value{display:block;min-width:0;text-align:left}
+.date-input-box input[type=date]::-webkit-datetime-edit{min-width:0;padding:0}
+@media(max-width:650px){
+  #entry-form .entry-date-field,#entry-form .entry-meal-field{grid-column:1/-1;width:100%;min-width:0;max-width:100%}
+  #entry-form .form-grid{row-gap:18px}
+  .filters,.filters>label{width:100%;min-width:0;max-width:100%}
+}
