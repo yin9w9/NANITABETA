@@ -20,3 +20,13 @@
   #toast{bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 }
 @media(min-width:651px) and (max-width:850px){.filters{grid-template-columns:repeat(2,minmax(0,1fr))}.filters button{grid-column:1/-1}}
+.nutrient-inputs{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.nutrient-field{min-width:0;display:flex;flex-direction:column;gap:9px}
+.portion-choices{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) minmax(48px,1.25fr);gap:5px}
+.portion-choices button{min-width:0;min-height:44px;padding:8px 3px;border:1px solid var(--border);border-radius:9px;background:#f4f5ed;font-size:15px;touch-action:manipulation}
+.portion-choices button[aria-pressed=true]{background:var(--green);border-color:var(--green);color:white;font-weight:600}
+.portion-choices button[data-manual-input]{font-size:12px}
+.portion-value{font-size:12px;min-height:18px;color:#74846d}
+.nutrient-field input{min-height:44px;font-size:16px}
+@media(max-width:650px){.nutrient-inputs{grid-template-columns:minmax(0,1fr);gap:20px}.portion-choices{gap:7px}.portion-choices button{min-height:48px}}
+@media(max-width:360px){dialog{padding-left:12px;padding-right:12px}.portion-choices{grid-template-columns:repeat(5,minmax(0,1fr));gap:4px}}

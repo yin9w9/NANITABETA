@@ -41,10 +41,34 @@ function renderGoals(){$('#goals-form').innerHTML=keys.map(k=>`<label>${icons[k]
 $('#goals-form').onsubmit=async e=>{e.preventDefault();const next=Object.fromEntries(keys.map(k=>[k,Number(new FormData(e.target).get(k))]));try{ensureAuth();if(user){if(!ready)throw Error('雲端載入中，請稍候');await cloud.f.setDoc(cloud.f.doc(cloud.db,'foodUsers',user.uid,'settings','goals'),next);}else{local.goals=next;localSave();goals=next;}render();notify('營養目標已儲存');}catch(err){notify(err.message);}};
 const form=$('#entry-form');
 function openEntry(e){editing=e?.id||null;form.reset();form.elements.date.value=e?.date||$('#day').value||dateKey();if(e)for(const k of ['name','meal','mode','factor','note'])form.elements[k].value=e[k]??'';$('#form-title').textContent=e?'編輯這一餐':'記下一餐';$('#form-error').textContent='';renderInputs(e);$('#entry-dialog').showModal();}
-function renderInputs(e){const gram=form.elements.mode.value==='grams';$('#factor-label').hidden=!gram;$('#nutrient-inputs').innerHTML=['protein','carbs','fat','veg','water'].map(k=>`<label>${icons[k]} ${labels[k]}（${k==='water'?'ml':k==='veg'?'份':gram?'g':'份'}）<input name="${k}" type="number" min="0" max="100000" step="any" value="${e?.[k]??0}" required></label>`).join('');preview();}
+function renderInputs(e){
+ const gram=form.elements.mode.value==='grams';$('#factor-label').hidden=!gram;
+ $('#nutrient-inputs').innerHTML=['protein','carbs','fat','veg','water'].map(k=>{
+  const value=e?.[k]??0,u=k==='water'?'ml':k==='veg'?'份':gram?'g':'份',id='nutrient-'+k;
+  const quick=!gram&&k!=='water',manual=quick&&value!==0&&![1,2,3,4].includes(Number(value));
+  return `<div class="nutrient-field" ${quick?`data-portion="${k}" data-manual="${manual}"`:''}><label for="${id}">${icons[k]} ${labels[k]}（${u}）</label>${quick?`<div class="portion-choices" role="group" aria-label="${labels[k]}份數">${[1,2,3,4].map(n=>`<button type="button" data-value="${n}" aria-label="${labels[k]} ${n}份" aria-pressed="false">${n}</button>`).join('')}<button type="button" data-manual-input aria-label="自行輸入${labels[k]}份數" aria-pressed="false">輸入</button></div><span class="portion-value" aria-live="polite"></span>`:''}<input id="${id}" name="${k}" aria-label="${labels[k]}（${u}）" type="number" inputmode="decimal" min="0" max="100000" step="any" value="${value}" ${quick&&!manual?'hidden':''} required></div>`;
+ }).join('');
+ $$('[data-portion]').forEach(field=>{
+  const input=field.querySelector('input');
+  field.querySelectorAll('[data-value]').forEach(button=>button.onclick=()=>{
+   input.value=field.dataset.manual!=='true'&&input.value===button.dataset.value?'0':button.dataset.value;
+   field.dataset.manual='false';input.hidden=true;preview();
+  });
+  field.querySelector('[data-manual-input]').onclick=()=>{field.dataset.manual='true';input.hidden=false;preview();input.focus();input.select();};
+ });
+ preview();
+}
+function syncPortionControls(){
+ $$('[data-portion]').forEach(field=>{
+  const input=field.querySelector('input'),manual=field.dataset.manual==='true',value=Number(input.value)||0;
+  field.querySelector('.portion-value').textContent=value===0?'0 份 · 不計入':`${fmt(value)} 份`;
+  field.querySelectorAll('[data-value]').forEach(button=>button.setAttribute('aria-pressed',String(!manual&&value===Number(button.dataset.value))));
+  field.querySelector('[data-manual-input]').setAttribute('aria-pressed',String(manual));
+ });
+}
 form.elements.mode.onchange=()=>{renderInputs();notify('已切換單位，營養數值已歸零，請重新輸入');};
 function readForm(){const e=Object.fromEntries(new FormData(form));keys.forEach(k=>e[k]=Number(e[k]));e.factor=Number(e.factor);return e;}
-function preview(){const e=readForm();$('#conversion-preview').textContent='換算份數：'+chips(e)+(e.mode==='grams'?'。扣除後小於0的蛋白質／油脂以0份計。':'');}
+function preview(){syncPortionControls();const e=readForm();$('#conversion-preview').textContent='換算份數：'+chips(e)+(e.mode==='grams'?'。扣除後小於0的蛋白質／油脂以0份計。':'');}
 form.oninput=preview;form.elements.factor.onchange=preview;
 $('#close-dialog').onclick=()=>$('#entry-dialog').close();
 form.onsubmit=async event=>{event.preventDefault();$('#save-entry').disabled=true;try{const e={...readForm(),id:editing||crypto.randomUUID(),updatedAt:Date.now()};e.name=e.name.trim();if(!validEntry(e))throw Error('請填寫有效的名稱、日期及非負營養數值');await saveEntry(e);$('#entry-dialog').close();notify('已記下這一餐 ♡');}catch(err){$('#form-error').textContent='儲存失敗：'+err.message;}finally{$('#save-entry').disabled=false;}};
