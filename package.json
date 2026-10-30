@@ -1,0 +1,1 @@
+{"private":true,"type":"module","scripts":{"test":"node --test nutrition.test.mjs","start":"node server.cjs"}}

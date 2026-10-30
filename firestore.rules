@@ -1,0 +1,28 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function owner(uid) { return request.auth != null && request.auth.uid == uid; }
+  function amount(v) { return v is number && v >= 0 && v <= 100000; }
+  match /foodUsers/{uid}/entries/{id} {
+   allow read, delete: if owner(uid);
+   allow create, update: if owner(uid)
+    && request.resource.data.keys().hasOnly(['id','name','date','meal','mode','factor','protein','carbs','veg','water','fat','note','updatedAt'])
+    && request.resource.data.id == id
+    && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 100
+    && request.resource.data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    && request.resource.data.meal in ['早餐','午餐','晚餐','點心','飲水']
+    && request.resource.data.mode in ['servings','grams'] && request.resource.data.factor in [3,5,10]
+    && amount(request.resource.data.protein) && amount(request.resource.data.carbs) && amount(request.resource.data.fat) && amount(request.resource.data.veg) && amount(request.resource.data.water)
+    && request.resource.data.note is string && request.resource.data.note.size() <= 300 && request.resource.data.updatedAt is number;
+  }
+  match /foodUsers/{uid}/settings/goals {
+   allow read: if owner(uid);
+   allow create, update: if owner(uid) && request.resource.data.keys().hasOnly(['protein','carbs','veg','water','fat'])
+    && amount(request.resource.data.protein) && request.resource.data.protein > 0
+    && amount(request.resource.data.carbs) && request.resource.data.carbs > 0
+    && amount(request.resource.data.veg) && request.resource.data.veg > 0
+    && amount(request.resource.data.water) && request.resource.data.water > 0
+    && amount(request.resource.data.fat) && request.resource.data.fat > 0;
+  }
+ }
+}
