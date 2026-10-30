@@ -20,6 +20,14 @@
 
 ## Firebase
 
+### 雲端同步核准名單
+
+僅管理者與核准帳號可以讀寫自己的 `foodUsers/{uid}` 資料。管理者身分存在私有 `syncAdmins/{uid}` 文件，內容為 `{enabled:true}`，只能由 Firebase Console／受信任後端管理；網站客戶端不能新增或變更管理者。公開程式碼不包含管理者帳號識別碼。其他訪客仍可使用本機紀錄，Google 登入後若未獲核准，介面顯示原因並保留本機功能。
+
+管理者登入網站 →「目標與同步」→「核准雲端同步帳號」，輸入對方實際使用的 Google 電子郵件。名單存在私有 `syncApprovals/{lowercaseEmail}`，文件內容為 `{enabled:true}`，只有管理者可以新增、列出及取消；一般帳號僅能查詢自己的核准狀態。核准不授予其他人的飲食資料存取權。取消核准即停止雲端存取，既有雲端資料保留。對方核准後可重新載入或按「重新檢查同步資格」。
+
+安全限制由已部署的 Firestore Rules 執行，修改本機 JavaScript 不能繞過。未核准者無法讀寫飲食資料，但登入與核准資格查詢仍會有少量 Authentication／Firestore 用量，因此這不是對所有請求零用量的防濫用措施。
+
 1. 建立獨立 Firebase 專案，新增 Web app。
 2. 將公開 Web config 填入 `firebase-config.js` 的 `window.FIREBASE_CONFIG`，不可放服務帳號金鑰。
 3. Authentication 啟用 Google，設定支援電子郵件；Authorized domains 加入 `yin9w9.github.io` 與本機測試的 `127.0.0.1`、`localhost`。

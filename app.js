@@ -2,6 +2,12 @@ import {keys,defaults,servings,dateKey,range,totals} from './nutrition.js';
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
 const labels={protein:'蛋白質',carbs:'碳水',veg:'蔬菜',water:'飲水',fat:'油脂'},icons={protein:'🥚',carbs:'🍙',veg:'🥦',water:'💧',fat:'🥑'},colors={protein:['#cb9c84','#f3e8df'],carbs:['#c2b06f','#f2efdf'],veg:['#94ab83','#eaf0e3'],water:['#8bafbe','#e5eef1'],fat:['#b6a2bc','#eee7f0']};
 const LOCAL='nanitabeta-local-v1';
+let isAdmin=false;
+let authEpoch=0;
+$('#upload-local').nextElementSibling.textContent='只有管理者核准的 Google 帳號可使用雲端同步；未核准者仍可使用本機紀錄。本機資料不自動上傳，核准登入後可按「合併」匯入。';
+const accessPanel=document.createElement('section');accessPanel.id='access-panel';accessPanel.className='panel';accessPanel.hidden=true;
+accessPanel.innerHTML='<h2>核准雲端同步帳號</h2><p class="muted">只有你能管理名單。核准後，各帳號仍只能讀寫自己的飲食紀錄。你的管理帳號永久保留同步資格。</p><form id="approval-form"><label>對方的 Google 帳號電子郵件<input id="approval-email" type="email" maxlength="254" required placeholder="friend@gmail.com"></label><button class="primary full-width">核准此帳號</button></form><p id="approval-status" role="status"></p><div id="approval-list"></div><p class="muted small">取消核准會停止對方雲端存取，不會刪除既有雲端紀錄；對方仍可使用本機功能。核准名單不會公開在 GitHub。</p>';
+$('#settings .settings-grid').append(accessPanel);
 let authInitializing=Boolean(localStorage.getItem('nanitabeta-firebase')||window.FIREBASE_CONFIG);
 function ensureAuth(){if(authInitializing)throw Error('正在確認登入狀態，請稍候再儲存');}
 function ask(message){return new Promise(resolve=>{const dialog=document.createElement('dialog');const p=document.createElement('p');p.textContent=message;const actions=document.createElement('div');actions.style.cssText='display:flex;justify-content:flex-end;gap:12px';const cancel=document.createElement('button'),ok=document.createElement('button');cancel.className='secondary';cancel.textContent='取消';ok.className='primary';ok.textContent='確認';actions.append(cancel,ok);dialog.append(p,actions);document.body.append(dialog);let result=false;ok.onclick=()=>{result=true;dialog.close();};cancel.onclick=()=>dialog.close();dialog.onclose=()=>{dialog.remove();resolve(result);};dialog.showModal();cancel.focus();});}
@@ -53,8 +59,74 @@ $('#restore').onchange=async event=>{try{const file=event.target.files[0];if(!fi
 async function mergeEntry(e){if(!user)return saveEntry(e);if(!ready)throw Error('雲端尚未連線');const ref=cloud.f.doc(cloud.db,'foodUsers',user.uid,'entries',e.id);await cloud.f.runTransaction(cloud.db,async tx=>{const existing=await tx.get(ref);if(!existing.exists())tx.set(ref,e);});}
 $('#save-config').onclick=()=>{try{const c=JSON.parse($('#config').value);if(!['apiKey','authDomain','projectId','appId'].every(k=>typeof c[k]==='string'&&c[k]))throw Error('請包含 apiKey、authDomain、projectId、appId');if('private_key'in c)throw Error('請勿使用服務帳號金鑰');localStorage.setItem('nanitabeta-firebase',JSON.stringify(c));location.reload();}catch(e){notify('設定無效：'+e.message);}};
 function syncStatus(s){$('#sync-status').textContent=s;$('#connection').textContent='● '+s;}
-async function initCloud(){let config;try{config=JSON.parse(localStorage.getItem('nanitabeta-firebase')||'null')||window.FIREBASE_CONFIG;}catch{authInitializing=false;notify('Firebase 設定無效，請重新設定');return;}if(!config){authInitializing=false;return;}$('#config').value=JSON.stringify(config,null,2);try{const base='https://www.gstatic.com/firebasejs/12.4.0/';const [a,auth,f]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);const app=a.initializeApp(config),au=auth.getAuth(app),db=f.getFirestore(app);cloud={a,auth,f,au,db};await auth.setPersistence(au,auth.browserLocalPersistence);auth.onAuthStateChanged(au,u=>{authInitializing=false;unsubs.forEach(fn=>fn());unsubs=[];user=u;ready=false;$('#login').hidden=!!u;$('#logout').hidden=$('#upload-local').hidden=!u;$('#account-status').textContent=u?'已登入':'同步設定';if(!u){entries=local.entries;goals={...defaults,...local.goals};syncStatus('本機儲存模式');renderGoals();render();return;}entries=[];goals={...defaults};renderGoals();render();syncStatus('雲端載入中…');unsubs.push(f.onSnapshot(f.collection(db,'foodUsers',u.uid,'entries'),{includeMetadataChanges:true},snap=>{entries=snap.docs.map(d=>d.data()).filter(validEntry);ready=!snap.metadata.fromCache;syncStatus(snap.metadata.hasPendingWrites?'等待雲端確認…':snap.metadata.fromCache?'離線：顯示快取，請連線後再編輯':'雲端已同步');render();},err=>{ready=false;syncStatus('同步失敗：'+err.message);}));unsubs.push(f.onSnapshot(f.doc(db,'foodUsers',u.uid,'settings','goals'),s=>{goals={...defaults,...(s.data()||{})};renderGoals();render();},err=>syncStatus('目標同步失敗：'+err.message)));});}catch(e){authInitializing=false;syncStatus('Firebase 連線失敗：'+e.message);}}
-$('#login').onclick=async()=>{if(!cloud){notify('請先設定獨立 Firebase 專案的 Web config');show('settings');return;}try{await cloud.auth.signInWithPopup(cloud.au,new cloud.auth.GoogleAuthProvider());}catch(e){notify('登入失敗：'+e.message);}};
+function localMode(account,message='本機儲存模式'){
+ user=null;isAdmin=false;ready=false;entries=local.entries;goals={...defaults,...local.goals};accessPanel.hidden=true;
+ $('#login').hidden=false;$('#login').textContent=account?'重新檢查同步資格':'使用 Google 登入';
+ $('#logout').hidden=!account;$('#upload-local').hidden=true;$('#account-status').textContent='本機模式';
+ syncStatus(message);renderGoals();render();
+}
+function renderApprovals(snap){
+ $('#approval-status').textContent=snap.empty?'尚未核准其他帳號。':`已核准 ${snap.size} 個帳號`;
+ $('#approval-list').innerHTML=snap.docs.map(d=>`<div class="entry"><div class="entry-body"><strong>${esc(d.id)}</strong></div><button class="secondary" data-revoke="${esc(d.id)}">取消核准</button></div>`).join('');
+ $$('[data-revoke]').forEach(b=>b.onclick=async()=>{if(!await ask(`取消 ${b.dataset.revoke} 的雲端同步資格？既有紀錄會保留。`))return;b.disabled=true;try{await cloud.f.deleteDoc(cloud.f.doc(cloud.db,'syncApprovals',b.dataset.revoke));notify('已取消雲端同步資格');}catch(e){notify('取消失敗：'+e.message);b.disabled=false;}});
+}
+$('#approval-form').onsubmit=async event=>{
+ event.preventDefault();if(!user||!isAdmin)return;const email=$('#approval-email').value.trim().toLowerCase();
+ if(!/^[^\s@/]+@[^\s@/]+\.[^\s@/]+$/.test(email))return notify('請輸入有效的 Google 帳號電子郵件');
+ const button=event.target.querySelector('button');button.disabled=true;
+ try{await cloud.f.setDoc(cloud.f.doc(cloud.db,'syncApprovals',email),{enabled:true});$('#approval-email').value='';notify('已核准此帳號的雲端同步');}catch(e){notify('核准失敗：'+e.message);}finally{button.disabled=false;}
+};
+async function initCloud(){
+ let config;
+ try{config=JSON.parse(localStorage.getItem('nanitabeta-firebase')||'null')||window.FIREBASE_CONFIG;}catch{authInitializing=false;notify('Firebase 設定無效，請重新設定');return;}
+ if(!config){authInitializing=false;return;}
+ $('#config').value=JSON.stringify(config,null,2);
+ try{
+  const base='https://www.gstatic.com/firebasejs/12.4.0/';
+  const [a,auth,f]=await Promise.all([import(base+'firebase-app.js'),import(base+'firebase-auth.js'),import(base+'firebase-firestore.js')]);
+  const app=a.initializeApp(config),au=auth.getAuth(app),db=f.getFirestore(app);cloud={a,auth,f,au,db};
+  await auth.setPersistence(au,auth.browserLocalPersistence);
+  auth.onAuthStateChanged(au,async u=>{
+   const epoch=++authEpoch;unsubs.forEach(fn=>fn());unsubs=[];user=null;isAdmin=false;ready=false;accessPanel.hidden=true;
+   if(!u){authInitializing=false;localMode(null);return;}
+   authInitializing=true;syncStatus('正在確認雲端同步資格…');
+   try{
+    const admin=(await f.getDocFromServer(f.doc(db,'syncAdmins',u.uid))).data()?.enabled===true,accessRef=u.email&&u.emailVerified?f.doc(db,'syncApprovals',u.email.toLowerCase()):null;
+    const allowed=admin||(accessRef&&(await f.getDocFromServer(accessRef)).data()?.enabled===true);
+    if(epoch!==authEpoch)return;
+    authInitializing=false;
+    if(!allowed){localMode(u,'此帳號尚未獲核准雲端同步，已使用本機紀錄。請洽網站管理者核准後重新檢查。');return;}
+    user=u;isAdmin=admin;entries=[];goals={...defaults};
+    $('#login').hidden=true;$('#logout').hidden=false;$('#upload-local').hidden=false;$('#account-status').textContent='已登入';
+    renderGoals();render();syncStatus('雲端載入中…');
+    const accessFailure=err=>{
+     if(epoch!==authEpoch)return;
+     ready=false;
+     if(err.code==='permission-denied'){unsubs.forEach(fn=>fn());unsubs=[];localMode(u,'雲端同步資格已取消或尚未核准，目前使用本機紀錄。');}
+     else syncStatus('同步失敗：'+err.message);
+    };
+    unsubs.push(f.onSnapshot(f.collection(db,'foodUsers',u.uid,'entries'),{includeMetadataChanges:true},snap=>{
+     if(epoch!==authEpoch||!user)return;
+     entries=snap.docs.map(d=>d.data()).filter(validEntry);ready=!snap.metadata.fromCache;
+     syncStatus(snap.metadata.hasPendingWrites?'等待雲端確認…':snap.metadata.fromCache?'離線：顯示快取，請連線後再編輯':'雲端已同步');render();
+    },accessFailure));
+    unsubs.push(f.onSnapshot(f.doc(db,'foodUsers',u.uid,'settings','goals'),s=>{
+     if(epoch!==authEpoch||!user)return;goals={...defaults,...(s.data()||{})};renderGoals();render();
+    },accessFailure));
+    if(admin){
+     accessPanel.hidden=false;
+     unsubs.push(f.onSnapshot(f.collection(db,'syncApprovals'),renderApprovals,err=>{$('#approval-status').textContent='名單載入失敗：'+err.message;}));
+    }else{
+     unsubs.push(f.onSnapshot(accessRef,s=>{
+      if(epoch!==authEpoch||s.metadata.fromCache)return;
+      if(s.data()?.enabled!==true){unsubs.forEach(fn=>fn());unsubs=[];localMode(u,'雲端同步資格已取消，目前使用本機紀錄。');}
+     },accessFailure));
+    }
+   }catch(e){if(epoch!==authEpoch)return;authInitializing=false;localMode(u,'暫時無法確認雲端資格，已使用本機紀錄。請連線後重新檢查。');}
+  });
+ }catch(e){authInitializing=false;localMode(null,'Firebase 連線失敗，使用本機紀錄：'+e.message);}
+}
+$('#login').onclick=async()=>{if(!cloud){notify('請先設定獨立 Firebase 專案的 Web config');show('settings');return;}if(cloud.au.currentUser){location.reload();return;}try{await cloud.auth.signInWithPopup(cloud.au,new cloud.auth.GoogleAuthProvider());}catch(e){notify('登入失敗：'+e.message);}};
 $('#logout').onclick=async()=>{try{await cloud.auth.signOut(cloud.au);}catch(e){notify(e.message);}};
 $('#upload-local').onclick=async()=>{if(!user||!ready)return notify('請先登入並等待雲端載入');if(!await ask(`將本機 ${local.entries.length} 筆紀錄合併至目前 Google 帳號，相同 ID 保留雲端版本。`))return;$('#upload-local').disabled=true;try{for(const e of local.entries)await mergeEntry(e);notify('本機紀錄已合併至雲端，目標保留雲端設定');}catch(e){notify('合併未完成，可重試：'+e.message);}finally{$('#upload-local').disabled=false;}};
 renderGoals();render();initCloud();
